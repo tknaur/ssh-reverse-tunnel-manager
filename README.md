@@ -37,6 +37,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 - ✅ Syslog logging support
 - ✅ Process management (start/stop/restart/status)
 - ✅ Security hardening in service file
+- ✅ OpenSSH and Dropbear SSH client support
 
 🔧 **Configuration Options:**
 - Custom remote hosts and ports
@@ -44,6 +45,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 - Multiple SSH key support
 - Environment variable overrides
 - Optional configuration file support
+- Choice of SSH client (OpenSSH or Dropbear)
 
 📋 **Production Ready:**
 - Auto-restart on failure
@@ -182,6 +184,8 @@ The script respects the following environment variables:
 | `TUNNEL_PORT` | `2222` | Port on jump host for reverse tunnel |
 | `LOCAL_PORT` | `22` | Local port to forward (typically 22 for SSH) |
 | `SSH_KEY` | `~/.ssh/id_rsa` | Path to SSH private key |
+| `SSH_CLIENT` | `openssh` | SSH client to use: `openssh` or `dropbear` |
+| `DROPBEAR_OPTS` | `-y` | Additional options for dropbear's `dbclient` |
 | `PID_FILE` | `/var/run/ssh-reverse-tunnel.pid` | PID file location |
 
 ### Configuration File
@@ -287,6 +291,73 @@ sudo systemctl edit pi-ssh-tunnel
 sudo systemctl daemon-reload
 sudo systemctl restart pi-ssh-tunnel
 ```
+
+## Dropbear SSH Client Support
+
+For resource-constrained devices (Raspberry Pi, IoT devices), this script supports **Dropbear**, a lightweight SSH implementation that uses significantly less memory and CPU than OpenSSH.
+
+### Installation
+
+**Debian/Raspberry Pi OS:**
+```bash
+sudo apt install dropbear
+```
+
+**Other distributions:** Check your package manager for `dropbear`.
+
+### Using Dropbear
+
+Simply set the `SSH_CLIENT` environment variable to `dropbear`:
+
+```bash
+# Run with Dropbear
+SSH_CLIENT=dropbear /usr/local/bin/ssh-reverse-tunnel.sh start
+
+# Or set it in the config file
+echo "SSH_CLIENT=dropbear" >> /etc/ssh-reverse-tunnel.conf
+
+# Or override in systemd service
+sudo systemctl edit pi-ssh-tunnel
+# Add line: Environment="SSH_CLIENT=dropbear"
+sudo systemctl daemon-reload
+sudo systemctl restart pi-ssh-tunnel
+```
+
+**Compatibility Note:** Dropbear's `dbclient` is compatible with both OpenSSH `sshd` and Dropbear `sshd` on the remote jump host. You can use either server type on your remote machine.
+
+### Dropbear Options
+
+You can customize dropbear's `dbclient` behavior using `DROPBEAR_OPTS`:
+
+```bash
+# Default: auto-accept host keys
+DROPBEAR_OPTS=-y
+
+# Example: disable password authentication and auto-accept keys
+DROPBEAR_OPTS="-s -y"
+
+# Then run:
+SSH_CLIENT=dropbear /usr/local/bin/ssh-reverse-tunnel.sh start
+```
+
+**Common dbclient options:**
+- `-y`: Accept new host keys automatically
+- `-s`: Disable password authentication
+- `-T`: Disable pseudo-terminal allocation
+- `-N`: Don't execute a shell on the remote side (used by default)
+
+Run `dbclient -h` for a complete list of options.
+
+### Memory Comparison
+
+**OpenSSH client:**
+- Typical memory footprint: 10-20 MB
+- Best for: Full-featured SSH with many options
+
+**Dropbear:**
+- Typical memory footprint: 1-2 MB  
+- Best for: Lightweight SSH on embedded/IoT devices
+- Trade-off: Fewer configuration options, but sufficient for reverse tunneling
 
 ### Monitoring Script
 

@@ -15,6 +15,8 @@ LOCAL_PORT="${LOCAL_PORT:-22}"
 SSH_KEY="${SSH_KEY:-${HOME}/.ssh/id_rsa}"
 LOG_FILE="${LOG_FILE:-/var/log/ssh-reverse-tunnel.log}"
 PID_FILE="${PID_FILE:-/var/run/ssh-reverse-tunnel.pid}"
+SSH_CLIENT="${SSH_CLIENT:-openssh}"
+DROPBEAR_OPTS="${DROPBEAR_OPTS:--y}"
 
 # Script name for logging
 SCRIPT_NAME="$(basename "$0")"
@@ -79,14 +81,51 @@ validate_prerequisites() {
         return 1
     fi
     
-    # Check if ssh command exists
-    if ! command -v ssh &> /dev/null; then
-        log ERROR "ssh command not found"
+    # Check if selected SSH client command exists
+    local ssh_cmd=""
+    case "$SSH_CLIENT" in
+        openssh)
+            ssh_cmd="ssh"
+            ;;
+        dropbear)
+            ssh_cmd="dbclient"
+            ;;
+        *)
+            log ERROR "Unknown SSH_CLIENT: $SSH_CLIENT (must be 'openssh' or 'dropbear')"
+            return 1
+            ;;
+    esac
+    
+    if ! command -v "$ssh_cmd" &> /dev/null; then
+        log ERROR "$ssh_cmd command not found (SSH_CLIENT=$SSH_CLIENT)"
         return 1
     fi
     
-    log INFO "Prerequisites validated successfully"
+    log INFO "Prerequisites validated successfully (using $SSH_CLIENT)"
     return 0
+}
+
+# Start OpenSSH reverse tunnel
+start_tunnel_openssh() {
+    ssh -N \
+        -R "$TUNNEL_PORT:localhost:$LOCAL_PORT" \
+        -i "$SSH_KEY" \
+        -p "$REMOTE_PORT" \
+        -o StrictHostKeyChecking=accept-new \
+        -o ServerAliveInterval=60 \
+        -o ServerAliveCountMax=3 \
+        -o ExitOnForwardFailure=yes \
+        "$REMOTE_USER@$REMOTE_HOST" > /dev/null 2>&1 &
+}
+
+# Start Dropbear reverse tunnel
+start_tunnel_dropbear() {
+    dbclient -N \
+        -R "$TUNNEL_PORT:localhost:$LOCAL_PORT" \
+        -i "$SSH_KEY" \
+        -p "$REMOTE_PORT" \
+        $DROPBEAR_OPTS \
+        "$REMOTE_USER@$REMOTE_HOST" > /dev/null 2>&1 &
 }
 
 # Check if tunnel is already running
@@ -103,8 +142,9 @@ is_running() {
     return 1
 }
 
-# Start the reverse tunnel
-start_tunnel() {
+# Start the reverse tunnel using configured SSH client
+start_tunnel()
+{
     log INFO "Starting SSH reverse tunnel..."
     
     if is_running; then
@@ -124,26 +164,17 @@ start_tunnel() {
         mkdir -p "$pid_dir" 2>/dev/null || true
     fi
     
-    log INFO "Establishing tunnel: localhost:$LOCAL_PORT -> $REMOTE_HOST:$TUNNEL_PORT"
+    log INFO "Establishing tunnel: localhost:$LOCAL_PORT -> $REMOTE_HOST:$TUNNEL_PORT (using $SSH_CLIENT)"
     
-    # Start SSH reverse tunnel in background with autoreconnect
-    # -N: do not execute remote command
-    # -R: remote port forwarding
-    # -i: identity file
-    # -p: port
-    # -o StrictHostKeyChecking=accept-new: accept new host keys
-    # -o ServerAliveInterval=60: send keepalive every 60 seconds
-    # -o ServerAliveCountMax=3: retry 3 times before disconnecting
-    # -o ExitOnForwardFailure=yes: exit if forwarding fails
-    ssh -N \
-        -R "$TUNNEL_PORT:localhost:$LOCAL_PORT" \
-        -i "$SSH_KEY" \
-        -p "$REMOTE_PORT" \
-        -o StrictHostKeyChecking=accept-new \
-        -o ServerAliveInterval=60 \
-        -o ServerAliveCountMax=3 \
-        -o ExitOnForwardFailure=yes \
-        "$REMOTE_USER@$REMOTE_HOST" > /dev/null 2>&1 &
+    # Start tunnel based on selected SSH client
+    case "$SSH_CLIENT" in
+        openssh)
+            start_tunnel_openssh
+            ;;
+        dropbear)
+            start_tunnel_dropbear
+            ;;
+    esac
     
     local pid=$!
     echo "$pid" > "$PID_FILE"
@@ -229,6 +260,8 @@ Environment Variables (with defaults):
   TUNNEL_PORT     Port on jump host for reverse tunnel (default: $TUNNEL_PORT)
   LOCAL_PORT      Local port to forward (default: $LOCAL_PORT)
   SSH_KEY         Path to SSH private key (default: $SSH_KEY)
+  SSH_CLIENT      SSH client to use: 'openssh' or 'dropbear' (default: $SSH_CLIENT)
+  DROPBEAR_OPTS   Additional dbclient options (default: $DROPBEAR_OPTS)
   PID_FILE        PID file location (default: $PID_FILE)
 
 Examples:
@@ -239,6 +272,9 @@ Examples:
   # Override configuration
   SSH_KEY=/home/user/.ssh/custom_key $SCRIPT_NAME start
   TUNNEL_PORT=2222 $SCRIPT_NAME start
+  
+  # Use Dropbear SSH client
+  SSH_CLIENT=dropbear $SCRIPT_NAME start
 
 EOF
 }

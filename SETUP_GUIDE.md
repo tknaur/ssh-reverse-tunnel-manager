@@ -257,6 +257,83 @@ sudo nano /etc/systemd/system/pi-ssh-tunnel-backup.service
 # Change name and port
 ```
 
+### Using Dropbear SSH Client
+
+For resource-constrained devices like Raspberry Pi, you can use **Dropbear**, a lightweight SSH client alternative:
+
+#### Installation
+
+```bash
+# Debian/Raspberry Pi OS
+sudo apt install dropbear
+
+# Then enable it in the service
+sudo systemctl edit pi-ssh-tunnel
+# Add or modify line:
+# Environment="SSH_CLIENT=dropbear"
+
+sudo systemctl daemon-reload
+sudo systemctl restart pi-ssh-tunnel
+```
+
+#### Manual Usage
+
+```bash
+# Test with dropbear
+SSH_CLIENT=dropbear /usr/local/bin/ssh-reverse-tunnel.sh start
+
+# Check status
+/usr/local/bin/ssh-reverse-tunnel.sh status
+
+# Stop tunnel
+/usr/local/bin/ssh-reverse-tunnel.sh stop
+```
+
+**Server Compatibility:** The dropbear client (`dbclient`) works with both OpenSSH `sshd` and Dropbear `sshd` servers on your jump host. Both are fully compatible.
+
+#### Configuration File
+
+Edit `/etc/ssh-reverse-tunnel.conf`:
+
+```bash
+SSH_CLIENT=dropbear
+DROPBEAR_OPTS=-y
+```
+
+Then reload the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart pi-ssh-tunnel
+```
+
+#### Why Dropbear?
+
+- **Memory efficient:** ~1-2 MB vs ~10-20 MB for OpenSSH
+- **Lightweight:** Perfect for Raspberry Pi and embedded devices
+- **Sufficient for reverse tunneling:** Has all features needed for SSH port forwarding
+- **Low CPU usage:** Minimal processing overhead
+
+#### Troubleshooting Dropbear
+
+If the tunnel won't start with dropbear:
+
+```bash
+# Check if dbclient is installed
+which dbclient
+
+# Test connection manually
+dbclient -y -i ~/.ssh/id_rsa -p YOUR_SSH_PORT tunnel_user@jump_host
+
+# Check logs
+sudo journalctl -u pi-ssh-tunnel -f
+
+# Verify SSH key permissions
+chmod 600 ~/.ssh/id_rsa
+```
+
+**Note:** Dropbear has fewer options than OpenSSH. If you need advanced SSH features, stick with OpenSSH.
+
 ### Load Configuration from File
 
 Modify the ExecStart line to source the config file:
