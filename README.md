@@ -78,7 +78,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 1. **Clone or download the project:**
    ```bash
    git clone <repository-url>
-   cd piper
+   cd ssh-reverse-tunnel-manager
    ```
 
 2. **Install the script and service:**
