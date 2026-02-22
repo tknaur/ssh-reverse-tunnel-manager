@@ -1,0 +1,41 @@
+[Unit]
+Description=SSH Reverse Tunnel Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tunnel_user
+Group=tunnel_user
+WorkingDirectory=/home/tunnel_user
+
+# Main executable
+ExecStart=/usr/local/bin/ssh-reverse-tunnel.sh start
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Environment variables (customize as needed)
+Environment="REMOTE_HOST=jump_host"
+Environment="REMOTE_USER=tunnel_user"
+Environment="REMOTE_PORT=22"
+Environment="TUNNEL_PORT=2222"
+Environment="LOCAL_PORT=22"
+Environment="SSH_KEY=/home/tunnel_user/.ssh/id_rsa"
+Environment="PID_FILE=/var/run/pi-ssh-tunnel.pid"
+
+# Security settings
+PrivateTmp=yes
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/run/pi-ssh-tunnel.pid
+
+# Standard output and error
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi-ssh-tunnel
+
+[Install]
+WantedBy=multi-user.target
