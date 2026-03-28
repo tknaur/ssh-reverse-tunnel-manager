@@ -59,7 +59,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 | File | Purpose |
 |------|---------|
 | `ssh-reverse-tunnel.sh` | Main bash script with tunnel management logic |
-| `pi-ssh-tunnel.service` | systemd service unit file for automatic startup |
+| `ssh-reverse-tunnel.service` | systemd service unit file for automatic startup |
 | `ssh-reverse-tunnel.conf` | Configuration file with parameterized values |
 | `SETUP_GUIDE.md` | Detailed installation and troubleshooting guide |
 | `README.md` | This file |
@@ -85,7 +85,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
    ```bash
    sudo cp ssh-reverse-tunnel.sh /usr/local/bin/
    sudo chmod +x /usr/local/bin/ssh-reverse-tunnel.sh
-   sudo cp pi-ssh-tunnel.service /etc/systemd/system/
+   sudo cp ssh-reverse-tunnel.service /etc/systemd/system/
    sudo cp ssh-reverse-tunnel.conf /etc/
    ```
 
@@ -113,14 +113,14 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 5. **Enable and start the service:**
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl enable pi-ssh-tunnel
-   sudo systemctl start pi-ssh-tunnel
+   sudo systemctl enable ssh-reverse-tunnel
+   sudo systemctl start ssh-reverse-tunnel
    ```
 
 6. **Verify it's working:**
    ```bash
-   sudo systemctl status pi-ssh-tunnel
-   sudo journalctl -u pi-ssh-tunnel -f
+   sudo systemctl status ssh-reverse-tunnel
+   sudo journalctl -u ssh-reverse-tunnel -f
    ```
 
 ## Usage
@@ -129,19 +129,19 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 
 ```bash
 # Start the tunnel
-sudo systemctl start pi-ssh-tunnel
+sudo systemctl start ssh-reverse-tunnel
 
 # Stop the tunnel
-sudo systemctl stop pi-ssh-tunnel
+sudo systemctl stop ssh-reverse-tunnel
 
 # Restart the tunnel
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 
 # Check status
-sudo systemctl status pi-ssh-tunnel
+sudo systemctl status ssh-reverse-tunnel
 
 # View logs
-sudo journalctl -u pi-ssh-tunnel -f
+sudo journalctl -u ssh-reverse-tunnel -f
 ```
 
 ### Manual Execution
@@ -220,8 +220,8 @@ ssh -p 2222 your_user@jump_host
 
 ```bash
 # Check service status and logs
-sudo systemctl status pi-ssh-tunnel
-sudo journalctl -u pi-ssh-tunnel -n 50
+sudo systemctl status ssh-reverse-tunnel
+sudo journalctl -u ssh-reverse-tunnel -n 50
 
 # Test SSH connection manually
 ssh -p YOUR_SSH_PORT tunnel_user@jump_host
@@ -273,11 +273,11 @@ For more troubleshooting tips, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
 Create separate service files for multiple tunnels:
 
 ```bash
-sudo cp pi-ssh-tunnel.service /etc/systemd/system/pi-ssh-tunnel-backup.service
-sudo nano /etc/systemd/system/pi-ssh-tunnel-backup.service
+sudo cp ssh-reverse-tunnel.service /etc/systemd/system/ssh-reverse-tunnel-backup.service
+sudo nano /etc/systemd/system/ssh-reverse-tunnel-backup.service
 # Edit Description, Environment variables, and PID file path
 sudo systemctl daemon-reload
-sudo systemctl enable pi-ssh-tunnel-backup
+sudo systemctl enable ssh-reverse-tunnel-backup
 ```
 
 ### Custom SSH Key
@@ -285,11 +285,11 @@ sudo systemctl enable pi-ssh-tunnel-backup
 Specify a custom SSH key in the service file:
 
 ```bash
-sudo systemctl edit pi-ssh-tunnel
+sudo systemctl edit ssh-reverse-tunnel
 # Add or modify:
 # Environment="SSH_KEY=/path/to/custom/key"
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 ## Dropbear SSH Client Support
@@ -317,10 +317,10 @@ SSH_CLIENT=dropbear /usr/local/bin/ssh-reverse-tunnel.sh start
 echo "SSH_CLIENT=dropbear" >> /etc/ssh-reverse-tunnel.conf
 
 # Or override in systemd service
-sudo systemctl edit pi-ssh-tunnel
+sudo systemctl edit ssh-reverse-tunnel
 # Add line: Environment="SSH_CLIENT=dropbear"
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 **Compatibility Note:** Dropbear's `dbclient` is compatible with both OpenSSH `sshd` and Dropbear `sshd` on the remote jump host. You can use either server type on your remote machine.
@@ -366,11 +366,11 @@ Create a health check:
 ```bash
 #!/bin/bash
 while true; do
-    if systemctl is-active --quiet pi-ssh-tunnel; then
+    if systemctl is-active --quiet ssh-reverse-tunnel; then
         echo "$(date): Tunnel OK"
     else
         echo "$(date): Tunnel DOWN - Restarting..."
-        sudo systemctl restart pi-ssh-tunnel
+        sudo systemctl restart ssh-reverse-tunnel
     fi
     sleep 300  # Check every 5 minutes
 done
@@ -433,11 +433,11 @@ ssh -vvv -p YOUR_SSH_PORT tunnel_user@jump_host
 
 ```bash
 # Stop and disable service
-sudo systemctl stop pi-ssh-tunnel
-sudo systemctl disable pi-ssh-tunnel
+sudo systemctl stop ssh-reverse-tunnel
+sudo systemctl disable ssh-reverse-tunnel
 
 # Remove files
-sudo rm /etc/systemd/system/pi-ssh-tunnel.service
+sudo rm /etc/systemd/system/ssh-reverse-tunnel.service
 sudo rm /usr/local/bin/ssh-reverse-tunnel.sh
 sudo rm /etc/ssh-reverse-tunnel.conf
 
@@ -462,7 +462,7 @@ This project is provided as-is for educational and personal use.
 For issues and troubleshooting:
 1. Check the [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed troubleshooting
 2. Review script comments for implementation details
-3. Check systemd journal logs: `sudo journalctl -u pi-ssh-tunnel -f`
+3. Check systemd journal logs: `sudo journalctl -u ssh-reverse-tunnel -f`
 
 ## Related Resources
 

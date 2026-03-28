@@ -58,29 +58,29 @@ sudo cp ssh-reverse-tunnel.conf /etc/
 
 ```bash
 # Copy service file
-sudo cp pi-ssh-tunnel.service /etc/systemd/system/
+sudo cp ssh-reverse-tunnel.service /etc/systemd/system/
 
 # Reload systemd daemon
 sudo systemctl daemon-reload
 
 # Enable service to start on boot
-sudo systemctl enable pi-ssh-tunnel
+sudo systemctl enable ssh-reverse-tunnel
 
 # Start the service
-sudo systemctl start pi-ssh-tunnel
+sudo systemctl start ssh-reverse-tunnel
 
 # Check status
-sudo systemctl status pi-ssh-tunnel
+sudo systemctl status ssh-reverse-tunnel
 ```
 
 ### Step 4: Verify Tunnel is Working
 
 ```bash
 # Check if service is running
-sudo systemctl status pi-ssh-tunnel
+sudo systemctl status ssh-reverse-tunnel
 
 # Check journal logs
-sudo journalctl -u pi-ssh-tunnel -f
+sudo journalctl -u ssh-reverse-tunnel -f
 
 # From another machine, test SSH connection through tunnel (replace values with your actual configuration)
 ssh -p YOUR_TUNNEL_PORT tunnel_user@jump_host
@@ -90,10 +90,10 @@ ssh -p YOUR_TUNNEL_PORT tunnel_user@jump_host
 
 ### Via Environment Variables
 
-Edit `/etc/systemd/system/pi-ssh-tunnel.service` and modify the `Environment=` lines:
+Edit `/etc/systemd/system/ssh-reverse-tunnel.service` and modify the `Environment=` lines:
 
 ```bash
-sudo systemctl edit pi-ssh-tunnel
+sudo systemctl edit ssh-reverse-tunnel
 ```
 
 Then set your custom values:
@@ -105,7 +105,7 @@ Environment="TUNNEL_PORT=2222"
 Reload and restart:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 ### Via Configuration File
@@ -152,8 +152,8 @@ If you need to run the script manually (e.g., for debugging):
 
 ```bash
 # Check service status and error messages
-sudo systemctl status pi-ssh-tunnel
-sudo journalctl -u pi-ssh-tunnel -n 50
+sudo systemctl status ssh-reverse-tunnel
+sudo journalctl -u ssh-reverse-tunnel -n 50
 
 # Check if SSH key is readable by the tunnel user
 ls -la ~/.ssh/id_rsa
@@ -199,13 +199,13 @@ Check that:
 
 ```bash
 # View service status
-sudo systemctl status pi-ssh-tunnel
+sudo systemctl status ssh-reverse-tunnel
 
 # View recent logs
-sudo journalctl -u pi-ssh-tunnel --since "10 minutes ago"
+sudo journalctl -u ssh-reverse-tunnel --since "10 minutes ago"
 
 # Monitor in real-time
-sudo journalctl -u pi-ssh-tunnel -f
+sudo journalctl -u ssh-reverse-tunnel -f
 ```
 
 ### Create monitoring script
@@ -213,11 +213,11 @@ sudo journalctl -u pi-ssh-tunnel -f
 ```bash
 #!/bin/bash
 while true; do
-    if systemctl is-active --quiet pi-ssh-tunnel; then
+    if systemctl is-active --quiet ssh-reverse-tunnel; then
         echo "$(date): Tunnel OK"
     else
         echo "$(date): Tunnel DOWN - Restarting..."
-        sudo systemctl restart pi-ssh-tunnel
+        sudo systemctl restart ssh-reverse-tunnel
     fi
     sleep 300
 done
@@ -238,10 +238,10 @@ done
 If using a different SSH key than the default:
 
 ```bash
-sudo nano /etc/systemd/system/pi-ssh-tunnel.service
+sudo nano /etc/systemd/system/ssh-reverse-tunnel.service
 # Change: Environment="SSH_KEY=/path/to/custom/key"
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 ### Running Multiple Tunnels
@@ -250,10 +250,10 @@ Create separate service files for multiple tunnels:
 
 ```bash
 # Create second service
-sudo cp pi-ssh-tunnel.service /etc/systemd/system/pi-ssh-tunnel-backup.service
+sudo cp ssh-reverse-tunnel.service /etc/systemd/system/ssh-reverse-tunnel-backup.service
 
 # Edit the second service
-sudo nano /etc/systemd/system/pi-ssh-tunnel-backup.service
+sudo nano /etc/systemd/system/ssh-reverse-tunnel-backup.service
 # Change name and port
 ```
 
@@ -268,12 +268,12 @@ For resource-constrained devices like Raspberry Pi, you can use **Dropbear**, a 
 sudo apt install dropbear
 
 # Then enable it in the service
-sudo systemctl edit pi-ssh-tunnel
+sudo systemctl edit ssh-reverse-tunnel
 # Add or modify line:
 # Environment="SSH_CLIENT=dropbear"
 
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 #### Manual Usage
@@ -304,7 +304,7 @@ Then reload the service:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart pi-ssh-tunnel
+sudo systemctl restart ssh-reverse-tunnel
 ```
 
 #### Why Dropbear?
@@ -326,7 +326,7 @@ which dbclient
 dbclient -y -i ~/.ssh/id_rsa -p YOUR_SSH_PORT tunnel_user@jump_host
 
 # Check logs
-sudo journalctl -u pi-ssh-tunnel -f
+sudo journalctl -u ssh-reverse-tunnel -f
 
 # Verify SSH key permissions
 chmod 600 ~/.ssh/id_rsa
@@ -346,13 +346,13 @@ ExecStart=/bin/bash -c 'source /etc/ssh-reverse-tunnel.conf && /usr/local/bin/ss
 
 ```bash
 # Stop the service
-sudo systemctl stop pi-ssh-tunnel
+sudo systemctl stop ssh-reverse-tunnel
 
 # Disable from boot
-sudo systemctl disable pi-ssh-tunnel
+sudo systemctl disable ssh-reverse-tunnel
 
 # Remove service file
-sudo rm /etc/systemd/system/pi-ssh-tunnel.service
+sudo rm /etc/systemd/system/ssh-reverse-tunnel.service
 
 # Remove script
 sudo rm /usr/local/bin/ssh-reverse-tunnel.sh
