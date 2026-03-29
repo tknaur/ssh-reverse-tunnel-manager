@@ -21,6 +21,32 @@ DROPBEAR_OPTS="${DROPBEAR_OPTS:--y}"
 # Script name for logging
 SCRIPT_NAME="$(basename "$0")"
 
+# Load configuration from file
+load_config() {
+    local config_file="${1:-/etc/ssh-reverse-tunnel.conf}"
+    
+    # Try alternative paths if the file doesn't exist
+    if [[ ! -f "$config_file" ]]; then
+        config_file="$(dirname "$0")/ssh-reverse-tunnel.conf"
+    fi
+    
+    if [[ ! -f "$config_file" ]]; then
+        config_file="${HOME}/.config/ssh-reverse-tunnel.conf"
+    fi
+    
+    # Source the config file if it exists
+    if [[ -f "$config_file" ]]; then
+        # Use source with a subshell to safely load configuration
+        # This allows environment variables to override config file settings
+        set +u
+        source "$config_file"
+        set -u
+        log DEBUG "Configuration loaded from: $config_file"
+    else
+        log DEBUG "No configuration file found, using defaults"
+    fi
+}
+
 # Color output (disabled when not a TTY)
 if [[ -t 1 ]]; then
     RED='\033[0;31m'
@@ -253,7 +279,13 @@ Commands:
   restart     Restart the tunnel
   status      Check tunnel status
 
-Environment Variables (with defaults):
+Configuration:
+  The script loads configuration from (in order of precedence):
+  1. /etc/ssh-reverse-tunnel.conf
+  2. ./ssh-reverse-tunnel.conf (same directory as script)
+  3. ~/.config/ssh-reverse-tunnel.conf
+
+Environment Variables (override config file):
   REMOTE_HOST     Jump host hostname (default: $REMOTE_HOST)
   REMOTE_USER     Jump host user (default: $REMOTE_USER)
   REMOTE_PORT     Jump host SSH port (default: $REMOTE_PORT)
@@ -269,7 +301,7 @@ Examples:
   $SCRIPT_NAME stop
   $SCRIPT_NAME status
   
-  # Override configuration
+  # Override configuration from file
   SSH_KEY=/home/user/.ssh/custom_key $SCRIPT_NAME start
   TUNNEL_PORT=2222 $SCRIPT_NAME start
   
@@ -282,6 +314,9 @@ EOF
 # Main command dispatcher
 main() {
     local command="${1:-}"
+    
+    # Load configuration from file before executing command
+    load_config
     
     case "$command" in
         start)
