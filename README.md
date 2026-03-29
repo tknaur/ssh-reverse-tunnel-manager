@@ -635,3 +635,31 @@ ssh -vvv -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host
 
 See [SETUP_GUIDE.md](SETUP_GUIDE.md#ssh-key-generation-guide) for detailed key generation instructions.
 
+
+### Only Dropbear Installed (No ssh-keygen)
+
+If you only have `dropbear` installed, here are your options:
+
+**Option 1: Install openssh-client (RECOMMENDED)**
+```bash
+sudo apt install openssh-client
+# Then use ssh-keygen as above
+```
+**Why?** openssh-client is small (~5-10 MB) and provides `ssh-keygen`.
+
+**Option 2: Generate on another machine**
+```bash
+# On machine with OpenSSH:
+ssh-keygen -t ed25519 -f ~/.ssh/id_rsa
+
+# Copy to Dropbear machine:
+scp ~/.ssh/id_rsa dropbear-user@dropbear-host:~/.ssh/id_rsa
+```
+
+**Option 3: Pre-existing key**
+```bash
+# If you already have a key from another system
+cp /path/to/existing/key ~/.ssh/id_rsa
+chmod 600 ~/.ssh/id_rsa
+```
+

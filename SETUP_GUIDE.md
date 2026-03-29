@@ -96,6 +96,98 @@ ssh-keygen -t rsa -b 4096 -C "home-tunnel-dropbear" -f ~/.ssh/dropbear_key
 - ✅ OpenSSH keys - Full support (since Dropbear 2016+)
 - ❌ ECDSA keys - Limited support on older versions
 
+### When Only Dropbear is Installed (No ssh-keygen)
+
+If you have only `dropbear` and `dbclient` installed (no `openssh-client`), you have several options:
+
+#### Option 1: Install openssh-client (Recommended)
+
+```bash
+# Debian/Raspberry Pi OS
+sudo apt install openssh-client
+
+# Then use ssh-keygen as above
+ssh-keygen -t ed25519 -C "home-tunnel" -f ~/.ssh/id_rsa
+```
+
+**Why?** `openssh-client` provides `ssh-keygen` which is the easiest way to generate keys. It's small and adds minimal overhead.
+
+#### Option 2: Generate on Another Machine
+
+Generate your key on a machine with `ssh-keygen` available, then copy it to your home machine:
+
+```bash
+# On machine with OpenSSH installed:
+ssh-keygen -t ed25519 -C "home-tunnel-dropbear" -f ~/.ssh/id_rsa
+
+# Copy to your Dropbear machine
+scp ~/.ssh/id_rsa user@dropbear-machine:~/.ssh/id_rsa
+scp ~/.ssh/id_rsa.pub user@dropbear-machine:~/.ssh/id_rsa.pub
+
+# On the Dropbear machine:
+chmod 600 ~/.ssh/id_rsa
+chmod 700 ~/.ssh
+```
+
+#### Option 3: Use dropbear Key Tools
+
+Dropbear includes `dropbearkey` but it's primarily for server keys. However, you can use it with conversion:
+
+```bash
+# Check if dropbearkey is available
+which dropbearkey
+
+# Generate Dropbear format key
+dropbearkey -t ed25519 -f ~/.ssh/id_dropbear -s 4096
+
+# Convert to OpenSSH format (if you have ssh-keygen installed)
+# This requires ssh-keygen, so this is circular...
+```
+
+**Note:** This approach requires `dropbear-convert` or manual conversion, which is more complex. **Option 1 or 2 is recommended.**
+
+#### Option 4: Use Pre-shared Keys or Passwords
+
+If key generation is problematic, you can temporarily use password authentication:
+
+```bash
+# Connect with password (less secure, but works)
+dbclient -p 22 tunnel@your.jump.host
+
+# After connecting, you can copy your public key to authorized_keys
+# Then disable password auth
+```
+
+**⚠️ Note:** This is less secure and should be temporary.
+
+### Minimal Setup with Only Dropbear
+
+If you absolutely cannot install `openssh-client`, here's the minimal workflow:
+
+```bash
+# 1. Install dropbear package (if not already installed)
+sudo apt install dropbear
+
+# 2. Install openssh-client for ssh-keygen (very small)
+sudo apt install openssh-client
+
+# 3. Generate key
+ssh-keygen -t ed25519 -C "home-tunnel" -f ~/.ssh/id_rsa
+
+# 4. Add public key to jump host
+cat ~/.ssh/id_rsa.pub | ssh -p 22 tunnel@your.jump.host \
+  "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+
+# 5. Test with dropbear
+dbclient -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host "echo Success"
+```
+
+**Package sizes (minimal overhead):**
+- `openssh-client`: ~5-10 MB (very small)
+- `dropbear`: ~1-2 MB
+
+Installing both `openssh-client` + `dropbear` still uses less space than `openssh-server`!
+
 ### Using Different Keys for Different Clients
 
 You can generate separate keys for different purposes:
