@@ -17,6 +17,7 @@ LOG_FILE="${LOG_FILE:-/var/log/ssh-reverse-tunnel.log}"
 PID_FILE="${PID_FILE:-/var/run/ssh-reverse-tunnel.pid}"
 SSH_CLIENT="${SSH_CLIENT:-openssh}"
 DROPBEAR_OPTS="${DROPBEAR_OPTS:--y}"
+DEBUG="${DEBUG:-0}"
 
 # Script name for logging
 SCRIPT_NAME="$(basename "$0")"
@@ -133,6 +134,9 @@ validate_prerequisites() {
 
 # Start OpenSSH reverse tunnel
 start_tunnel_openssh() {
+    local output_redir=""
+    [[ "$DEBUG" == "1" ]] && output_redir="" || output_redir="> /dev/null 2>&1"
+    
     ssh -N \
         -R "$TUNNEL_PORT:localhost:$LOCAL_PORT" \
         -i "$SSH_KEY" \
@@ -141,17 +145,20 @@ start_tunnel_openssh() {
         -o ServerAliveInterval=60 \
         -o ServerAliveCountMax=3 \
         -o ExitOnForwardFailure=yes \
-        "$REMOTE_USER@$REMOTE_HOST" > /dev/null 2>&1 &
+        "$REMOTE_USER@$REMOTE_HOST" $output_redir &
 }
 
 # Start Dropbear reverse tunnel
 start_tunnel_dropbear() {
+    local output_redir=""
+    [[ "$DEBUG" == "1" ]] && output_redir="" || output_redir="> /dev/null 2>&1"
+    
     dbclient -N \
         -R "$TUNNEL_PORT:localhost:$LOCAL_PORT" \
         -i "$SSH_KEY" \
         -p "$REMOTE_PORT" \
         $DROPBEAR_OPTS \
-        "$REMOTE_USER@$REMOTE_HOST" > /dev/null 2>&1 &
+        "$REMOTE_USER@$REMOTE_HOST" $output_redir &
 }
 
 # Check if tunnel is already running
