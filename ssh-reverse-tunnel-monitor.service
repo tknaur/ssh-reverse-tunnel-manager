@@ -1,0 +1,11 @@
+[Unit]
+Description=SSH Reverse Tunnel Monitor
+After=network.target ssh-reverse-tunnel.service
+Wants=ssh-reverse-tunnel-monitor.timer
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ssh-reverse-tunnel/monitor-tunnel.sh -c /etc/ssh-reverse-tunnel.conf
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tunnel-monitor
