@@ -33,6 +33,7 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 - ✅ SSH key-based authentication
 - ✅ Automatic keepalive and reconnection
 - ✅ systemd service integration
+- ✅ Health monitoring and auto-restart
 - ✅ Comprehensive error handling and validation
 - ✅ Syslog logging support
 - ✅ Process management (start/stop/restart/status)
@@ -48,8 +49,9 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 - Choice of SSH client (OpenSSH or Dropbear)
 
 📋 **Production Ready:**
-- Auto-restart on failure
+- Auto-restart on failure with health monitoring
 - Graceful shutdown with force-kill fallback
+- Periodic tunnel health checks via systemd timer
 - Network dependency management
 - Journal logging integration
 - Comprehensive documentation
@@ -61,6 +63,9 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 | `ssh-reverse-tunnel.sh` | Main bash script with tunnel management logic |
 | `ssh-reverse-tunnel.service` | systemd service unit file for automatic startup |
 | `ssh-reverse-tunnel.conf` | Configuration file with parameterized values |
+| `monitor-tunnel.sh` | Health check script for monitoring and auto-restart |
+| `ssh-reverse-tunnel-monitor.service` | systemd service for monitor script |
+| `ssh-reverse-tunnel-monitor.timer` | systemd timer for periodic health checks |
 | `SETUP_GUIDE.md` | Detailed installation and troubleshooting guide |
 | `README.md` | This file |
 
@@ -76,52 +81,63 @@ When you connect to `jump_host:TUNNEL_PORT`, the traffic is securely tunneled ba
 ### Installation
 
 1. **Clone or download the project:**
-   ```bash
-   git clone <repository-url>
-   cd ssh-reverse-tunnel-manager
-   ```
+    ```bash
+    git clone <repository-url>
+    cd ssh-reverse-tunnel-manager
+    ```
 
 2. **Install the script and service:**
-   ```bash
-   sudo cp ssh-reverse-tunnel.sh /usr/local/bin/
-   sudo chmod +x /usr/local/bin/ssh-reverse-tunnel.sh
-   sudo cp ssh-reverse-tunnel.service /etc/systemd/system/
-   sudo cp ssh-reverse-tunnel.conf /etc/
-   ```
+    ```bash
+    sudo cp ssh-reverse-tunnel.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/ssh-reverse-tunnel.sh
+    sudo cp monitor-tunnel.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/monitor-tunnel.sh
+    sudo cp ssh-reverse-tunnel.service /etc/systemd/system/
+    sudo cp ssh-reverse-tunnel-monitor.service /etc/systemd/system/
+    sudo cp ssh-reverse-tunnel-monitor.timer /etc/systemd/system/
+    sudo cp ssh-reverse-tunnel.conf /etc/
+    ```
 
 3. **Configure your settings:**
-   ```bash
-   sudo nano /etc/ssh-reverse-tunnel.conf
-   ```
-   
-   Update with your actual values:
-   ```ini
-   REMOTE_HOST=your.jump.host.com
-   REMOTE_USER=your_username
-   REMOTE_PORT=22
-   TUNNEL_PORT=2222
-   LOCAL_PORT=22
-   SSH_KEY=/home/your_user/.ssh/id_rsa
-   ```
+    ```bash
+    sudo nano /etc/ssh-reverse-tunnel.conf
+    ```
+    
+    Update with your actual values:
+    ```ini
+    REMOTE_HOST=your.jump.host.com
+    REMOTE_USER=your_username
+    REMOTE_PORT=22
+    TUNNEL_PORT=2222
+    LOCAL_PORT=22
+    SSH_KEY=/home/your_user/.ssh/id_rsa
+    ```
 
 4. **Set up SSH key authentication:**
-   ```bash
-   ssh-keygen -t ed25519 -C "home-tunnel-$(hostname)" -f ~/.ssh/id_rsa
-   # Copy public key to jump host's ~/.ssh/authorized_keys
-   ```
+    ```bash
+    ssh-keygen -t ed25519 -C "home-tunnel-$(hostname)" -f ~/.ssh/id_rsa
+    # Copy public key to jump host's ~/.ssh/authorized_keys
+    ```
 
 5. **Enable and start the service:**
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable ssh-reverse-tunnel
-   sudo systemctl start ssh-reverse-tunnel
-   ```
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable ssh-reverse-tunnel
+    sudo systemctl start ssh-reverse-tunnel
+    ```
 
-6. **Verify it's working:**
-   ```bash
-   sudo systemctl status ssh-reverse-tunnel
-   sudo journalctl -u ssh-reverse-tunnel -f
-   ```
+6. **Enable monitoring and auto-restart:**
+    ```bash
+    sudo systemctl enable ssh-reverse-tunnel-monitor.timer
+    sudo systemctl start ssh-reverse-tunnel-monitor.timer
+    ```
+
+7. **Verify it's working:**
+    ```bash
+    sudo systemctl status ssh-reverse-tunnel
+    sudo systemctl status ssh-reverse-tunnel-monitor.timer
+    sudo journalctl -u ssh-reverse-tunnel -f
+    ```
 
 ## Usage
 
@@ -170,6 +186,21 @@ REMOTE_HOST=custom.host TUNNEL_PORT=3333 /usr/local/bin/ssh-reverse-tunnel.sh st
 SSH_KEY=/path/to/custom/key /usr/local/bin/ssh-reverse-tunnel.sh start
 ```
 
+### Monitoring
+
+The monitoring script automatically checks tunnel health every minute and restarts if needed:
+
+```bash
+# View monitor status
+sudo systemctl status ssh-reverse-tunnel-monitor.timer
+
+# View monitor logs
+sudo journalctl -u ssh-reverse-tunnel-monitor.service -f
+
+# Check next scheduled run
+systemctl list-timers ssh-reverse-tunnel-monitor.timer
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -187,6 +218,7 @@ The script respects the following environment variables:
 | `SSH_CLIENT` | `openssh` | SSH client to use: `openssh` or `dropbear` |
 | `DROPBEAR_OPTS` | `-y` | Additional options for dropbear's `dbclient` |
 | `PID_FILE` | `/var/run/ssh-reverse-tunnel.pid` | PID file location |
+| `DEBUG` | `0` | Set to `1` to show SSH output for debugging |
 
 ### Configuration File
 
@@ -202,6 +234,23 @@ LOCAL_PORT=22
 SSH_KEY=/home/tunnel/.ssh/id_rsa
 ```
 
+## Important: Jump Host Configuration
+
+For the reverse tunnel to be accessible from the internet, your jump host must have `GatewayPorts` enabled:
+
+```bash
+# On your jump host:
+sudo nano /etc/ssh/sshd_config
+
+# Add or modify this line:
+GatewayPorts yes
+
+# Reload SSH:
+sudo systemctl reload sshd
+```
+
+Without this setting, the tunnel port will only be accessible from localhost on the jump host.
+
 ## Testing the Tunnel
 
 Once the tunnel is established, test it from another machine:
@@ -210,8 +259,8 @@ Once the tunnel is established, test it from another machine:
 # SSH through the tunnel
 ssh -p 2222 your_user@jump_host
 
-# Other services (if forwarding additional ports)
-# Connect to any service running on your home machine
+# Or using the tunnel for other services
+ssh -p 2222 -l your_user jump_host
 ```
 
 ## Troubleshooting
@@ -231,7 +280,17 @@ ls -la ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
 ```
 
-### Connection refused
+### Connection refused from internet
+
+```bash
+# Check if tunnel port is listening on jump host
+ssh jump_host "netstat -tlnp | grep TUNNEL_PORT"
+
+# Verify GatewayPorts is enabled on jump host
+ssh jump_host "grep GatewayPorts /etc/ssh/sshd_config"
+```
+
+### Connection refused locally
 
 ```bash
 # Ensure SSH server is running on local machine
@@ -359,23 +418,6 @@ Run `dbclient -h` for a complete list of options.
 - Best for: Lightweight SSH on embedded/IoT devices
 - Trade-off: Fewer configuration options, but sufficient for reverse tunneling
 
-### Monitoring Script
-
-Create a health check:
-
-```bash
-#!/bin/bash
-while true; do
-    if systemctl is-active --quiet ssh-reverse-tunnel; then
-        echo "$(date): Tunnel OK"
-    else
-        echo "$(date): Tunnel DOWN - Restarting..."
-        sudo systemctl restart ssh-reverse-tunnel
-    fi
-    sleep 300  # Check every 5 minutes
-done
-```
-
 ## Security Considerations
 
 🔒 **Important Security Notes:**
@@ -398,7 +440,7 @@ done
 4. **Monitoring**
    - Monitor logs for failed connection attempts
    - Track active connections
-   - Set up alerts for tunnel failures
+   - The included monitoring script auto-restarts failed tunnels
 
 5. **Network**
    - Use key-based authentication only
@@ -429,6 +471,13 @@ Verify jump host details:
 ssh -vvv -p YOUR_SSH_PORT tunnel_user@jump_host
 ```
 
+### Debug mode
+
+Enable debug output to see SSH errors:
+```bash
+DEBUG=1 /usr/local/bin/ssh-reverse-tunnel.sh start
+```
+
 ## Uninstallation
 
 ```bash
@@ -436,9 +485,16 @@ ssh -vvv -p YOUR_SSH_PORT tunnel_user@jump_host
 sudo systemctl stop ssh-reverse-tunnel
 sudo systemctl disable ssh-reverse-tunnel
 
+# Stop and disable monitor timer
+sudo systemctl stop ssh-reverse-tunnel-monitor.timer
+sudo systemctl disable ssh-reverse-tunnel-monitor.timer
+
 # Remove files
 sudo rm /etc/systemd/system/ssh-reverse-tunnel.service
+sudo rm /etc/systemd/system/ssh-reverse-tunnel-monitor.service
+sudo rm /etc/systemd/system/ssh-reverse-tunnel-monitor.timer
 sudo rm /usr/local/bin/ssh-reverse-tunnel.sh
+sudo rm /usr/local/bin/monitor-tunnel.sh
 sudo rm /etc/ssh-reverse-tunnel.conf
 
 # Reload systemd
@@ -463,13 +519,119 @@ For issues and troubleshooting:
 1. Check the [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed troubleshooting
 2. Review script comments for implementation details
 3. Check systemd journal logs: `sudo journalctl -u ssh-reverse-tunnel -f`
+4. Enable debug mode: `DEBUG=1 ssh-reverse-tunnel.sh start`
 
 ## Related Resources
 
 - [SSH Port Forwarding Documentation](https://linux.die.net/man/1/ssh)
 - [systemd Service Documentation](https://www.freedesktop.org/software/systemd/man/systemd.service.html)
 - [SSH Key Authentication Guide](https://wiki.archlinux.org/title/SSH_keys)
+- [systemd Timers Documentation](https://www.freedesktop.org/software/systemd/man/systemd.timer.html)
 
 ---
 
 **Created with ❤️ for secure remote access**
+
+## SSH Key Generation
+
+### Generating Keys for OpenSSH
+
+The standard SSH client that comes with most systems:
+
+```bash
+# Generate ED25519 key (recommended - modern and secure)
+ssh-keygen -t ed25519 -C "home-tunnel-$(hostname)" -f ~/.ssh/id_rsa
+
+# Or RSA key (if ED25519 not supported)
+ssh-keygen -t rsa -b 4096 -C "home-tunnel-$(hostname)" -f ~/.ssh/id_rsa
+```
+
+**Key differences:**
+- **ED25519**: Modern, fast, small (~600 bytes), best choice
+- **RSA-4096**: Widely compatible, larger (~3KB), slower
+
+### Generating Keys for Dropbear
+
+Dropbear uses the same OpenSSH key formats, so you can use the same keys or generate separate ones:
+
+```bash
+# Generate key for Dropbear (compatible with OpenSSH)
+ssh-keygen -t ed25519 -C "home-tunnel-dropbear" -f ~/.ssh/dropbear_key
+```
+
+**Dropbear supports:**
+- ✅ ED25519 keys
+- ✅ RSA keys  
+- ✅ OpenSSH format keys
+- ❌ ECDSA (limited support on older versions)
+
+### Using Different Keys
+
+Generate separate keys for different purposes:
+
+```bash
+# Key for OpenSSH tunnel
+ssh-keygen -t ed25519 -C "home-tunnel-openssh" -f ~/.ssh/id_tunnel_openssh
+
+# Key for Dropbear tunnel
+ssh-keygen -t ed25519 -C "home-tunnel-dropbear" -f ~/.ssh/id_tunnel_dropbear
+```
+
+Then set in config:
+```ini
+SSH_KEY=/home/tunnel/.ssh/id_tunnel_openssh
+# or
+SSH_KEY=/home/tunnel/.ssh/id_tunnel_dropbear
+```
+
+### Key Permissions
+
+⚠️ **Critical:** SSH requires strict permissions on keys:
+
+```bash
+# Set correct permissions
+chmod 600 ~/.ssh/id_rsa
+chmod 700 ~/.ssh
+
+# Verify (private key should be -rw-------)
+ls -la ~/.ssh/id_rsa
+```
+
+### Adding Public Key to Jump Host
+
+```bash
+# Method 1: Using ssh-copy-id (easiest)
+ssh-copy-id -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host
+
+# Method 2: Manual paste
+cat ~/.ssh/id_rsa.pub
+# Copy output to jump host's ~/.ssh/authorized_keys
+
+# Method 3: Pipe to remote
+cat ~/.ssh/id_rsa.pub | ssh -p 22 tunnel@your.jump.host \
+  "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+```
+
+### Testing Key Authentication
+
+```bash
+# Test OpenSSH
+ssh -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host "echo 'Success!'"
+
+# Test Dropbear
+dbclient -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host "echo 'Success!'"
+
+# Verbose output for troubleshooting
+ssh -vvv -i ~/.ssh/id_rsa -p 22 tunnel@your.jump.host
+```
+
+### Key Security
+
+1. **Use passphrases** - Protect your key with a passphrase
+2. **Never share private keys** - Only public keys go on servers
+3. **Backup securely** - Encrypt and store backups safely
+4. **Separate keys** - Use different keys for different services
+5. **Monitor access** - Check logs for unauthorized attempts
+
+See [SETUP_GUIDE.md](SETUP_GUIDE.md#ssh-key-generation-guide) for detailed key generation instructions.
+

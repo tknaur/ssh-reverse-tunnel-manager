@@ -1,0 +1,12 @@
+[Unit]
+Description=SSH Reverse Tunnel Monitor Timer
+Requires=ssh-reverse-tunnel-monitor.service
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
