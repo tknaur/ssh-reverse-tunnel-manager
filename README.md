@@ -530,8 +530,6 @@ For issues and troubleshooting:
 
 ---
 
-**Created with ❤️ for secure remote access**
-
 ## SSH Key Generation
 
 ### Generating Keys for OpenSSH
@@ -662,4 +660,9 @@ scp ~/.ssh/id_rsa dropbear-user@dropbear-host:~/.ssh/id_rsa
 cp /path/to/existing/key ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
 ```
+
+---
+
+**Created with ❤️ for secure remote access**
+
 
